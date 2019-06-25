@@ -3293,6 +3293,8 @@ contains
       call parameters_gyro_write_task(gyrotropic_task, '-dw', 'calculate the tildeD tensor')
       call parameters_gyro_write_task(gyrotropic_task, '-c', 'calculate the C tensor')
       call parameters_gyro_write_task(gyrotropic_task, '-k', 'calculate the K tensor')
+      call parameters_gyro_write_task(gyrotropic_task, &
+                '-nernst', 'calculate the E-resolved berry curvature ( needed for Nernst effect ) ')
       call parameters_gyro_write_task(gyrotropic_task, '-noa', 'calculate the interbad natural optical activity')
       call parameters_gyro_write_task(gyrotropic_task, '-dos', 'calculate the density of states')
 

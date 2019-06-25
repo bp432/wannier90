@@ -43,6 +43,8 @@ end kpoint_path
 #berry_task = ahc                
 #berry_kmesh = 25 25 25
 
+#gyrotropic = true
+
 begin unit_cell_cart
 bohr
  2.71175  2.71175 2.71175

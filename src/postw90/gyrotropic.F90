@@ -88,6 +88,7 @@ contains
     real(kind=dp), allocatable    :: gyro_K_orb(:, :, :)
     real(kind=dp), allocatable    :: gyro_C(:, :, :)
     real(kind=dp), allocatable    :: gyro_D(:, :, :)
+    real(kind=dp), allocatable    :: gyro_Nernst(:, :)
     real(kind=dp), allocatable    :: gyro_Dw(:, :, :, :)
     real(kind=dp), allocatable    :: gyro_NOA_spn(:, :, :, :)
     real(kind=dp), allocatable    :: gyro_NOA_orb(:, :, :, :)
@@ -101,7 +102,7 @@ contains
     integer           :: n, i, j, k, ikpt, if, ierr, loop_x, loop_y, loop_z, &
                          loop_xyz, ifreq, &
                          file_unit
-    logical           :: eval_K, eval_C, eval_D, eval_Dw, eval_NOA, eval_spn, eval_DOS
+    logical           :: eval_K, eval_C, eval_D, eval_Dw, eval_NOA, eval_spn, eval_DOS, eval_Nernst
 
     if (nfermi == 0) call io_error( &
       'Must specify one or more Fermi levels when gyrotropic=true')
@@ -121,6 +122,7 @@ contains
     eval_spn = .false.
     eval_NOA = .false.
     eval_DOS = .false.
+    eval_Nernst = .false.
 
     if (index(gyrotropic_task, '-k') > 0) eval_K = .true.
     if (index(gyrotropic_task, '-c') > 0) eval_C = .true.
@@ -129,6 +131,7 @@ contains
     if (index(gyrotropic_task, '-spin') > 0) eval_spn = .true.
     if (index(gyrotropic_task, '-noa') > 0) eval_NOA = .true.
     if (index(gyrotropic_task, '-dos') > 0) eval_DOS = .true.
+    if (index(gyrotropic_task, '-nernst') > 0) eval_nernst = .true.
     if (index(gyrotropic_task, 'all') > 0) then
       eval_K = .true.
       eval_C = .true.
@@ -137,6 +140,7 @@ contains
       if (spinors) eval_spn = .true.
       eval_NOA = .true.
       eval_DOS = .true.
+      eval_Nernst = .true.
     endif
 
     if (.not. (eval_K .or. eval_noa)) eval_spn = .false.
@@ -147,7 +151,7 @@ contains
     ! Wannier matrix elements, allocations and initializations
 
     call get_HH_R
-    if (eval_D .or. eval_Dw .or. eval_K .or. eval_NOA) then
+    if (eval_D .or. eval_Dw .or. eval_K .or. eval_NOA .or. eval_Nernst) then
       call get_AA_R
     endif
 
@@ -169,6 +173,12 @@ contains
     if (eval_D) then
       allocate (gyro_D(3, 3, nfermi))
       gyro_D = 0.0_dp
+    endif
+
+
+    if (eval_Nernst) then
+      allocate (gyro_Nernst(3, nfermi))
+      gyro_Nernst = 0.0_dp
     endif
 
     if (eval_DOS) then
@@ -201,6 +211,8 @@ contains
       write (stdout, '(1x,a)') '------------------------------------------'
 
       if (eval_D) write (stdout, '(/,3x,a)') '* D-tensor  --- Eq.2 of TAS17 '
+
+      if (eval_Nernst) write (stdout, '(/,3x,a)') '* Efermi-resolved Berry curvature '
 
       if (eval_dos) write (stdout, '(/,3x,a)') '* density of states '
 
@@ -263,8 +275,8 @@ contains
 
       call gyrotropic_get_k_list(kpt, kweight, &
                                  gyro_K_spn, gyro_K_orb, gyro_D, gyro_Dw, gyro_C, &
-                                 gyro_DOS, gyro_NOA_orb, gyro_NOA_spn, &
-                                 eval_K, eval_D, eval_Dw, eval_NOA, eval_spn, eval_C, eval_dos)
+                                 gyro_DOS, gyro_NOA_orb, gyro_NOA_spn, gyro_Nernst, &
+                                 eval_K, eval_D, eval_Dw, eval_NOA, eval_spn, eval_C, eval_dos, eval_Nernst)
 
     end do !loop_xyz
 
@@ -277,6 +289,9 @@ contains
 
     if (eval_D) &
       call comms_reduce(gyro_D(1, 1, 1), 3*3*nfermi, 'SUM')
+
+    if (eval_Nernst) &
+      call comms_reduce(gyro_Nernst(1, 1), 3*nfermi, 'SUM')
 
     if (eval_C) &
       call comms_reduce(gyro_C(1, 1, 1), 3*3*nfermi, 'SUM')
@@ -355,6 +370,18 @@ contains
         call gyrotropic_outprint_tensor(f_out_name_tmp, arrEf=gyro_D, units=units_tmp, &
                                         comment=comment_tmp)
       endif
+
+      if (eval_nernst) then
+        fac = 1./cell_volume
+        gyro_Nernst(:, :) = gyro_Nernst( :, :)*fac
+
+        f_out_name_tmp = 'Nernst'
+        units_tmp = "1/(Ang Ev)"
+        comment_tmp = "The E-fermi-resolved Berry curvature"
+        call gyrotropic_outprint_tensor(f_out_name_tmp, arrEf2D=gyro_Nernst, units=units_tmp, &
+                                        comment=comment_tmp)
+      endif
+
 
       if (eval_Dw) then
         fac = 1./cell_volume
@@ -441,8 +468,8 @@ contains
 
   subroutine gyrotropic_get_k_list(kpt, kweight, &
                                    gyro_K_spn, gyro_K_orb, gyro_D, gyro_Dw, gyro_C, &
-                                   gyro_DOS, gyro_NOA_orb, gyro_NOA_spn, &
-                                   eval_K, eval_D, eval_Dw, eval_NOA, eval_spn, eval_C, eval_dos)
+                                   gyro_DOS, gyro_NOA_orb, gyro_NOA_spn, gyro_Nernst, &
+                                   eval_K, eval_D, eval_Dw, eval_NOA, eval_spn, eval_C, eval_dos, eval_Nernst)
     !======================================================================!
     !                                                                      !
     ! Contribution from point k to the GME tensor, Eq.(9) of ZMS16,        !
@@ -464,12 +491,14 @@ contains
     ! gyro_C_k = delta(E_kn-E_f).(d E_{kn}/d k_i).(d E_{kn}/d k_j)         !
     ! [units of energy*length^3]                                           !
     !                                                                      !
-    ! gyro_DOS_k = delta(E_kn-E_f)                                          !
+    ! gyro_DOS_k = delta(E_kn-E_f)                                         !
     ! [units of 1/Energy]                                                  !
     !                                                                      !
-    ! gme_NOA_orb_k = ?????                                           !
+    ! gme_NOA_orb_k = ?????                                                !
     !                                                                      !
-    ! gme_NOA_spn_k = ??????                                           !
+    ! gme_NOA_spn_k = ??????                                               !
+    !                                                                      !
+    ! gyro_Nernst   delta(E_kn-E_f) * Omega_{kn,i}                         !
     !                                                                      !
     !======================================================================!
 
@@ -496,10 +525,11 @@ contains
                                                           gyro_D, &
                                                           gyro_C
     real(kind=dp), dimension(:, :, :, :), intent(inout) :: gyro_Dw, gyro_NOA_spn, gyro_NOA_orb
+    real(kind=dp), dimension(:, :), intent(inout) :: gyro_Nernst
     real(kind=dp), dimension(:), intent(inout) :: gyro_DOS
 
     logical, intent(in) :: eval_K, eval_D, eval_Dw, &
-                           eval_C, eval_NOA, eval_spn, eval_dos
+                           eval_C, eval_NOA, eval_spn, eval_dos,  eval_Nernst
 
     complex(kind=dp), allocatable :: UU(:, :)
     complex(kind=dp), allocatable :: HH(:, :)
@@ -583,7 +613,7 @@ contains
               orb_nk(i) = sum(imh_k(:, i, 1)) - sum(img_k(:, i, 1))
               curv_nk(i) = sum(imf_k(:, i, 1))
             enddo
-          else if (eval_D) then
+          else if (eval_D.or.eval_Nernst) then
             occ = 0.0_dp
             occ(n) = 1.0_dp
             call berry_get_imf_klist(kpt, imf_k, occ)
@@ -618,6 +648,8 @@ contains
           if (eval_C) gyro_C(:, j, ifermi) = &
             gyro_C(:, j, ifermi) + del_eig(n, :)*del_eig(n, j)*delta
         enddo !j
+        if (eval_Nernst) gyro_Nernst(:, ifermi) = &
+                      gyro_Nernst(:, ifermi) + curv_nk(:)*delta
         if (eval_dos) gyro_DOS(ifermi) = gyro_DOS(ifermi) + delta
 
       enddo !ifermi
@@ -897,7 +929,7 @@ contains
 
   end subroutine gyrotropic_get_NOA_Bnl_spin
 
-  subroutine gyrotropic_outprint_tensor(f_out_name, arrEf, arrEF1D, arrEfW, units, comment, symmetrize)
+  subroutine gyrotropic_outprint_tensor(f_out_name, arrEf, arrEF1D, arrEF2D, arrEfW, units, comment, symmetrize)
     use w90_parameters, only: gyrotropic_nfreq, gyrotropic_freq_list, &
       nfermi, fermi_energy_list
     use w90_io, only: io_file_unit, seedname, stdout
@@ -908,6 +940,7 @@ contains
     real(kind=dp), dimension(:, :, :), intent(in), optional :: arrEf
     real(kind=dp), dimension(:, :, :, :), intent(in), optional :: arrEfW
     real(kind=dp), dimension(:), intent(in), optional :: arrEf1D
+    real(kind=dp), dimension(:,:), intent(in), optional :: arrEf2D
     logical, optional, intent(in) :: symmetrize
 
     character(len=120)  :: file_name
@@ -936,18 +969,21 @@ contains
       enddo
     elseif (present(arrEf1D)) then
       call gyrotropic_outprint_tensor_w(file_unit, 0.0_dp, arrN=arrEf1D)
+    elseif (present(arrEf2D)) then
+      call gyrotropic_outprint_tensor_w(file_unit, 0.0_dp, arr3N=arrEf2D)
     endif
 
     close (file_unit)
 
   end subroutine gyrotropic_outprint_tensor
 
-  subroutine gyrotropic_outprint_tensor_w(file_unit, omega, arr33N, arrN, symmetrize)
+  subroutine gyrotropic_outprint_tensor_w(file_unit, omega, arr33N, arr3N, arrN, symmetrize)
     use w90_parameters, only: nfermi, fermi_energy_list
 
     integer, intent(in) :: file_unit
     real(kind=dp), intent(in) :: omega
     real(kind=dp), dimension(:, :, :), optional, intent(in) :: arr33N
+    real(kind=dp), dimension(:, :), optional, intent(in) :: arr3N
     real(kind=dp), dimension(:), optional, intent(in) :: arrN
     ! symmetrize= True  - get symmetric and assimetric parts
     ! symmetrize= False - write the asymmetric (in xy) tensor gamma_{xyz}
@@ -957,7 +993,7 @@ contains
     real(kind=dp) ::  xx(nfermi), yy(nfermi), zz(nfermi), &
                      xy(nfermi), xz(nfermi), yz(nfermi), &
                      x(nfermi), y(nfermi), z(nfermi)
-    integer       ::  i
+    integer       ::  i,j
     logical lsym
 
     if (present(arr33N)) then
@@ -1002,7 +1038,7 @@ contains
       do i = 1, nfermi
         write (file_unit, '(11E15.6)') fermi_energy_list(i), omega, xx(i), yy(i), zz(i), xy(i), xz(i), yz(i), x(i), y(i), z(i)
       enddo
-    endif
+    endif ! arr33N
 
     if (present(arrN)) then
       write (file_unit, '(2a15)') '# EFERMI(eV) '
@@ -1011,6 +1047,15 @@ contains
       enddo
 
     endif
+
+    if (present(arr3N)) then
+      write (file_unit, '(2a15)') '# EFERMI(eV) '
+      do i = 1, nfermi
+        write (file_unit, '(11E15.6)') fermi_energy_list(i), (arr3N(j,i), j=1,3)
+      enddo
+
+    endif
+
     write (file_unit, *)
     write (file_unit, *)
   end subroutine gyrotropic_outprint_tensor_w
