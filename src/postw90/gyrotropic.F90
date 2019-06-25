@@ -88,7 +88,8 @@ contains
     real(kind=dp), allocatable    :: gyro_K_orb(:, :, :)
     real(kind=dp), allocatable    :: gyro_C(:, :, :)
     real(kind=dp), allocatable    :: gyro_D(:, :, :)
-    real(kind=dp), allocatable    :: gyro_Nernst(:, :)
+    real(kind=dp), allocatable    :: gyro_DAHC(:, :)
+    real(kind=dp), allocatable    :: gyro_AHC(:, :)
     real(kind=dp), allocatable    :: gyro_Dw(:, :, :, :)
     real(kind=dp), allocatable    :: gyro_NOA_spn(:, :, :, :)
     real(kind=dp), allocatable    :: gyro_NOA_orb(:, :, :, :)
@@ -102,7 +103,7 @@ contains
     integer           :: n, i, j, k, ikpt, if, ierr, loop_x, loop_y, loop_z, &
                          loop_xyz, ifreq, &
                          file_unit
-    logical           :: eval_K, eval_C, eval_D, eval_Dw, eval_NOA, eval_spn, eval_DOS, eval_Nernst
+    logical           :: eval_K, eval_C, eval_D, eval_Dw, eval_NOA, eval_spn, eval_DOS, eval_DAHC
 
     if (nfermi == 0) call io_error( &
       'Must specify one or more Fermi levels when gyrotropic=true')
@@ -122,7 +123,7 @@ contains
     eval_spn = .false.
     eval_NOA = .false.
     eval_DOS = .false.
-    eval_Nernst = .false.
+    eval_DAHC = .false.
 
     if (index(gyrotropic_task, '-k') > 0) eval_K = .true.
     if (index(gyrotropic_task, '-c') > 0) eval_C = .true.
@@ -131,7 +132,7 @@ contains
     if (index(gyrotropic_task, '-spin') > 0) eval_spn = .true.
     if (index(gyrotropic_task, '-noa') > 0) eval_NOA = .true.
     if (index(gyrotropic_task, '-dos') > 0) eval_DOS = .true.
-    if (index(gyrotropic_task, '-nernst') > 0) eval_nernst = .true.
+    if (index(gyrotropic_task, '-ahc') > 0) eval_DAHC = .true.
     if (index(gyrotropic_task, 'all') > 0) then
       eval_K = .true.
       eval_C = .true.
@@ -140,7 +141,7 @@ contains
       if (spinors) eval_spn = .true.
       eval_NOA = .true.
       eval_DOS = .true.
-      eval_Nernst = .true.
+      eval_DAHC = .true.
     endif
 
     if (.not. (eval_K .or. eval_noa)) eval_spn = .false.
@@ -151,7 +152,7 @@ contains
     ! Wannier matrix elements, allocations and initializations
 
     call get_HH_R
-    if (eval_D .or. eval_Dw .or. eval_K .or. eval_NOA .or. eval_Nernst) then
+    if (eval_D .or. eval_Dw .or. eval_K .or. eval_NOA .or. eval_DAHC) then
       call get_AA_R
     endif
 
@@ -176,9 +177,9 @@ contains
     endif
 
 
-    if (eval_Nernst) then
-      allocate (gyro_Nernst(3, nfermi))
-      gyro_Nernst = 0.0_dp
+    if (eval_DAHC) then
+      allocate (gyro_DAHC(3, nfermi))
+      gyro_DAHC = 0.0_dp
     endif
 
     if (eval_DOS) then
@@ -212,7 +213,7 @@ contains
 
       if (eval_D) write (stdout, '(/,3x,a)') '* D-tensor  --- Eq.2 of TAS17 '
 
-      if (eval_Nernst) write (stdout, '(/,3x,a)') '* Efermi-resolved Berry curvature '
+      if (eval_DAHC) write (stdout, '(/,3x,a)') '* derivative od AHC over Ef '
 
       if (eval_dos) write (stdout, '(/,3x,a)') '* density of states '
 
@@ -275,8 +276,8 @@ contains
 
       call gyrotropic_get_k_list(kpt, kweight, &
                                  gyro_K_spn, gyro_K_orb, gyro_D, gyro_Dw, gyro_C, &
-                                 gyro_DOS, gyro_NOA_orb, gyro_NOA_spn, gyro_Nernst, &
-                                 eval_K, eval_D, eval_Dw, eval_NOA, eval_spn, eval_C, eval_dos, eval_Nernst)
+                                 gyro_DOS, gyro_NOA_orb, gyro_NOA_spn, gyro_DAHC, &
+                                 eval_K, eval_D, eval_Dw, eval_NOA, eval_spn, eval_C, eval_dos, eval_DAHC)
 
     end do !loop_xyz
 
@@ -290,8 +291,8 @@ contains
     if (eval_D) &
       call comms_reduce(gyro_D(1, 1, 1), 3*3*nfermi, 'SUM')
 
-    if (eval_Nernst) &
-      call comms_reduce(gyro_Nernst(1, 1), 3*nfermi, 'SUM')
+    if (eval_DAHC) &
+      call comms_reduce(gyro_DAHC(1, 1), 3*nfermi, 'SUM')
 
     if (eval_C) &
       call comms_reduce(gyro_C(1, 1, 1), 3*3*nfermi, 'SUM')
@@ -371,15 +372,29 @@ contains
                                         comment=comment_tmp)
       endif
 
-      if (eval_nernst) then
-        fac = 1./cell_volume
-        gyro_Nernst(:, :) = gyro_Nernst( :, :)*fac
+      if (eval_DAHC) then
+        fac =  ( -1.0e8_dp*elem_charge_SI**2/(hbar_SI*cell_volume)  )
+        gyro_DAHC(:, :) = gyro_DAHC( :, :)*fac
+        f_out_name_tmp = 'dAHCdmu'
+        units_tmp = "S/(cm * eV)"
+        comment_tmp = "Derivative of AHC"
+        call gyrotropic_outprint_tensor(f_out_name_tmp, arrEf2D=gyro_DAHC, units=units_tmp, &
+                                        comment=comment_tmp) 
 
-        f_out_name_tmp = 'Nernst'
-        units_tmp = "1/(Ang Ev)"
-        comment_tmp = "The E-fermi-resolved Berry curvature"
-        call gyrotropic_outprint_tensor(f_out_name_tmp, arrEf2D=gyro_Nernst, units=units_tmp, &
-                                        comment=comment_tmp)
+        allocate(gyro_AHC(3,nfermi))
+        gyro_AHC(:, :)=0.
+        
+        do i=2,nfermi
+           gyro_AHC(:, i)=gyro_AHC(:, i-1)+(gyro_DAHC(:,i-1)+gyro_DAHC(:,i))*  &
+                           (fermi_energy_list(i) - fermi_energy_list(i-1) )/2
+        enddo
+
+        f_out_name_tmp = 'AHC'
+        units_tmp = "S/cm"
+        comment_tmp = "Anomalous Hall conductivity (up to a constant shift)"
+        call gyrotropic_outprint_tensor(f_out_name_tmp, arrEf2D=gyro_AHC, units=units_tmp, &
+                                        comment=comment_tmp) 
+
       endif
 
 
@@ -468,8 +483,8 @@ contains
 
   subroutine gyrotropic_get_k_list(kpt, kweight, &
                                    gyro_K_spn, gyro_K_orb, gyro_D, gyro_Dw, gyro_C, &
-                                   gyro_DOS, gyro_NOA_orb, gyro_NOA_spn, gyro_Nernst, &
-                                   eval_K, eval_D, eval_Dw, eval_NOA, eval_spn, eval_C, eval_dos, eval_Nernst)
+                                   gyro_DOS, gyro_NOA_orb, gyro_NOA_spn, gyro_DAHC, &
+                                   eval_K, eval_D, eval_Dw, eval_NOA, eval_spn, eval_C, eval_dos, eval_DAHC)
     !======================================================================!
     !                                                                      !
     ! Contribution from point k to the GME tensor, Eq.(9) of ZMS16,        !
@@ -498,7 +513,7 @@ contains
     !                                                                      !
     ! gme_NOA_spn_k = ??????                                               !
     !                                                                      !
-    ! gyro_Nernst   delta(E_kn-E_f) * Omega_{kn,i}                         !
+    ! gyro_DAHC   delta(E_kn-E_f) * Omega_{kn,i}                         !
     !                                                                      !
     !======================================================================!
 
@@ -525,11 +540,11 @@ contains
                                                           gyro_D, &
                                                           gyro_C
     real(kind=dp), dimension(:, :, :, :), intent(inout) :: gyro_Dw, gyro_NOA_spn, gyro_NOA_orb
-    real(kind=dp), dimension(:, :), intent(inout) :: gyro_Nernst
+    real(kind=dp), dimension(:, :), intent(inout) :: gyro_DAHC
     real(kind=dp), dimension(:), intent(inout) :: gyro_DOS
 
     logical, intent(in) :: eval_K, eval_D, eval_Dw, &
-                           eval_C, eval_NOA, eval_spn, eval_dos,  eval_Nernst
+                           eval_C, eval_NOA, eval_spn, eval_dos,  eval_DAHC
 
     complex(kind=dp), allocatable :: UU(:, :)
     complex(kind=dp), allocatable :: HH(:, :)
@@ -613,7 +628,7 @@ contains
               orb_nk(i) = sum(imh_k(:, i, 1)) - sum(img_k(:, i, 1))
               curv_nk(i) = sum(imf_k(:, i, 1))
             enddo
-          else if (eval_D.or.eval_Nernst) then
+          else if (eval_D.or.eval_DAHC) then
             occ = 0.0_dp
             occ(n) = 1.0_dp
             call berry_get_imf_klist(kpt, imf_k, occ)
@@ -648,8 +663,8 @@ contains
           if (eval_C) gyro_C(:, j, ifermi) = &
             gyro_C(:, j, ifermi) + del_eig(n, :)*del_eig(n, j)*delta
         enddo !j
-        if (eval_Nernst) gyro_Nernst(:, ifermi) = &
-                      gyro_Nernst(:, ifermi) + curv_nk(:)*delta
+        if (eval_DAHC) gyro_DAHC(:, ifermi) = &
+                      gyro_DAHC(:, ifermi) + curv_nk(:)*delta
         if (eval_dos) gyro_DOS(ifermi) = gyro_DOS(ifermi) + delta
 
       enddo !ifermi
