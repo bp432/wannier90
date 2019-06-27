@@ -28,6 +28,7 @@ program postw90
   use w90_dos
   use w90_berry
   use w90_gyrotropic
+  use w90_get_oper, only:  get_oper_save_main
   use w90_spin
   use w90_kpath
   use w90_kslice
@@ -185,10 +186,13 @@ program postw90
   !
   ! Now perform one or more of the following tasks
 
+  if (get_oper_save)  call get_oper_save_main
+
   ! ---------------------------------------------------------------
   ! Density of states calculated using a uniform interpolation mesh
   ! ---------------------------------------------------------------
   !
+ 
   if (dos .and. index(dos_task, 'dos_plot') > 0) call dos_main
 
 ! find_fermi_level commented for the moment in dos.F90
