@@ -15,7 +15,8 @@ begin projections
 Fe: sp3d2;dxy;dxz;dyz
 end projections
 
-#fermi_energy = 
+#fermi_energy = 12.6279
+
 
 kpath = true
 kpath_task = curv
@@ -43,12 +44,28 @@ end kpoint_path
 #berry_task = ahc                
 #berry_kmesh = 25 25 25
 
+#gyrotropic = true
+#gyrotropic_task = -dos-ahc
+#gyrotropic_kmesh = 25 25 25
+#gyrotropic_smr_fixed_en_width=0.001
+#gyrotropic_smr_max_arg=5
+#gyrotropic_degen_thresh=0.001
+#fermi_energy_min = 12
+#fermi_energy_max = 14
+#fermi_energy_step = 0.0002
+
+
+
 begin unit_cell_cart
 bohr
  2.71175  2.71175 2.71175
 -2.71175  2.71175 2.71175
 -2.71175 -2.71175 2.71175
 end unit_cell_cart
+
+
+
+
 
 begin atoms_frac
 Fe  0.000  0.000  0.000
