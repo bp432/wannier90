@@ -28,7 +28,7 @@ module w90_ws_distance
 
   private
   !
-  public :: ws_translate_dist, clean_ws_translate, ws_write_vec
+  public :: ws_translate_dist, clean_ws_translate, ws_write_vec, ws_write_vec_w19
   !
   integer, public, save, allocatable :: irdist_ws(:, :, :, :, :)!(3,ndegenx,num_wann,num_wann,nrpts)
   !! The integer number of unit cells to shift Wannier function j to put its centre
@@ -261,7 +261,6 @@ contains
     !! to be added to R vector in seedname_hr.dat, seedname_rmn.dat, etc.
     !! in order to have the second Wannier function inside the WS cell
     !! of the first one.
-
     use w90_io, only: io_error, io_stopwatch, io_file_unit, &
       seedname, io_date
     use w90_parameters, only: num_wann
@@ -281,6 +280,7 @@ contains
           status='unknown', err=101)
 
     if (use_ws_distance) then
+      call ws_translate_dist(nrpts, irvec)
       header = '## written on '//cdate//' at '//ctime//' with use_ws_distance=.true.'
       write (file_unit, '(A)') trim(header)
 
@@ -319,6 +319,52 @@ contains
     !====================================================!
   end subroutine ws_write_vec
   !====================================================!
+
+
+
+  subroutine ws_write_vec_w19(nrpts, irvec,file_unit)
+    !! Write to file the lattice vectors of the superlattice
+    !! to be added to R vector in seedname_hr.dat, seedname_rmn.dat, etc.
+    !! in order to have the second Wannier function inside the WS cell
+    !! of the first one.
+    use w90_parameters, only: num_wann
+
+    implicit none
+
+    integer, intent(in) :: nrpts
+    integer, intent(in) :: irvec(3, nrpts)
+    integer, intent(in) :: file_unit
+    integer:: irpt, iw, jw, ideg
+
+    if (use_ws_distance) then
+
+      call ws_translate_dist(nrpts, irvec)
+      write (file_unit,*) 'use_ws_distance=True'
+      do irpt = 1, nrpts
+        write (file_unit, '(I5)') irpt
+        do iw = 1, num_wann
+          do jw = 1, num_wann
+           if (( wdist_ndeg(iw, jw, irpt)==1).and.all( irdist_ws(:, ideg, iw, jw, irpt).eq.irvec(:, irpt))) cycle
+            write (file_unit, '(I5)') wdist_ndeg(iw, jw, irpt)
+            do ideg = 1, wdist_ndeg(iw, jw, irpt)
+              write (file_unit, '(5I5,2F12.6,I5)') irdist_ws(:, ideg, iw, jw, irpt) - &
+                irvec(:, irpt)
+            end do
+          end do
+        end do
+      end do
+      write (file_unit,*) 'End'
+    else
+      write (file_unit,*) 'use_ws_distance=False'
+    endif
+    return
+  !====================================================!
+  end subroutine ws_write_vec_w19
+  !====================================================!
+
+
+
+
   !====================================================!
   subroutine clean_ws_translate()
     !====================================================!

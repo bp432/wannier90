@@ -71,6 +71,8 @@ subroutine get_oper_save_main
       io_file_unit, seedname
     use w90_parameters, only: num_wann
     use w90_comms, only: on_root
+    use w90_ws_distance, only:   ws_write_vec_w19
+
     character(len=10) :: suffix
 
    
@@ -99,8 +101,14 @@ subroutine get_oper_save_main
         write(file_unit,*) (irvec(j,i),j=1,3),ndegen(i)
       enddo
       
+!!   Now write the ws_vec information
+    
+    call ws_write_vec_w19(nrpts, irvec,file_unit)
 
    close(file_unit)
+   
+
+   
    endif
 
    
