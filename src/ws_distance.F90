@@ -334,26 +334,31 @@ contains
     integer, intent(in) :: nrpts
     integer, intent(in) :: irvec(3, nrpts)
     integer, intent(in) :: file_unit
-    integer:: irpt, iw, jw, ideg
+    integer:: irpt, iw, jw, ideg,s
+    integer:: numij(nrpts)
 
     if (use_ws_distance) then
-
       call ws_translate_dist(nrpts, irvec)
-      write (file_unit,*) 'use_ws_distance=True'
+      write (file_unit,'(A)') 'use_ws_distance=True'
       do irpt = 1, nrpts
-        write (file_unit, '(I5)') irpt
+        s=0
         do iw = 1, num_wann
           do jw = 1, num_wann
-           if (( wdist_ndeg(iw, jw, irpt)==1).and.all( irdist_ws(:, ideg, iw, jw, irpt).eq.irvec(:, irpt))) cycle
-            write (file_unit, '(I5)') wdist_ndeg(iw, jw, irpt)
-            do ideg = 1, wdist_ndeg(iw, jw, irpt)
-              write (file_unit, '(5I5,2F12.6,I5)') irdist_ws(:, ideg, iw, jw, irpt) - &
-                irvec(:, irpt)
-            end do
+              if ( (wdist_ndeg(iw, jw, irpt)==1).and.all(irdist_ws(:, 1, iw, jw, irpt).eq.irvec(:,irpt)) ) cycle
+              s=s+1
+          end do
+        end do
+        write (file_unit, '(2I8)') irpt,s
+       enddo
+
+      do irpt = 1, nrpts
+        do iw = 1, num_wann
+          do jw = 1, num_wann
+              if ( (wdist_ndeg(iw, jw, irpt)==1).and.all(irdist_ws(:, 1, iw, jw, irpt).eq.irvec(:,irpt)) ) cycle
+              write (file_unit, '(10000I4)') iw, jw, (irdist_ws(:, ideg, iw, jw, irpt) , ideg = 1, wdist_ndeg(iw, jw, irpt))
           end do
         end do
       end do
-      write (file_unit,*) 'End'
     else
       write (file_unit,*) 'use_ws_distance=False'
     endif
