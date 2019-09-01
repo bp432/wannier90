@@ -26,7 +26,7 @@ module w90_get_oper
 
   public
 
-  private :: fourier_q_to_R, get_win_min, save_matrix
+  private :: fourier_q_to_R, fourier_q_to_R_FFT, get_win_min, save_matrix
 
   complex(kind=dp), allocatable, save :: HH_R(:, :, :) !  <0n|r|Rm>
   !! $$\langle 0n | H | Rm \rangle$$
@@ -61,104 +61,93 @@ contains
   !                   PUBLIC PROCEDURES                  !
   !======================================================!
 
-subroutine get_oper_save_main
+  subroutine get_oper_save_main
 
-    use w90_parameters, only: num_wann,  real_lattice, get_oper_save_task, spinors
-    use w90_postw90_common, only: nrpts,  irvec,ndegen
+    use w90_parameters, only: num_wann, real_lattice, get_oper_save_task, spinors
+    use w90_postw90_common, only: nrpts, irvec, ndegen
 
     use w90_constants, only: dp
     use w90_io, only: io_error, stdout, io_stopwatch, &
       io_file_unit, seedname
     use w90_parameters, only: num_wann
     use w90_comms, only: on_root
-    use w90_ws_distance, only:   ws_write_vec_w19
+    use w90_ws_distance, only: ws_write_vec_w19
 
     character(len=10) :: suffix
 
-   
-   integer :: file_unit,i,j
-   
-   
-   
-   
-   
-   
+    integer :: file_unit, i, j
+
     call get_HH_R
-    suffix="HH"
-    call save_matrix(suffix,mat0d=HH_R)
+    suffix = "HH"
+    call save_matrix(suffix, mat0d=HH_R)
 
-   if  (on_root) then
-   file_unit=io_file_unit()
-   open (file_unit, file=trim(seedname)//"_HH_save.info", form='formatted', status='unknown')
+    if (on_root) then
+      file_unit = io_file_unit()
+      open (file_unit, file=trim(seedname)//"_HH_save.info", form='formatted', status='unknown')
 
-      write(file_unit,*) num_wann,nrpts,spinors,"# num_wann , nrpts, spinors"
-      
-      do i=1,3
-        write(file_unit,*) real_lattice(i,1:3)
+      write (file_unit, *) num_wann, nrpts, spinors, "# num_wann , nrpts, spinors"
+
+      do i = 1, 3
+        write (file_unit, *) real_lattice(i, 1:3)
       enddo
-      
-      do i=1,nrpts
-        write(file_unit,*) (irvec(j,i),j=1,3),ndegen(i)
+
+      do i = 1, nrpts
+        write (file_unit, *) (irvec(j, i), j=1, 3), ndegen(i)
       enddo
-      
+
 !!   Now write the ws_vec information
-    
-    call ws_write_vec_w19(nrpts, irvec,file_unit)
 
-   close(file_unit)
-   
+      call ws_write_vec_w19(nrpts, irvec, file_unit)
 
-   
-   endif
+      close (file_unit)
 
-   
-   if (index(get_oper_save_task, 'a') > 0) then
-        call get_AA_R
-        suffix="AA"
-        call save_matrix(suffix,mat1d=AA_R)
-   endif
+    endif
 
-   if (index(get_oper_save_task, 'b') > 0) then
-        call get_BB_R
-        suffix="BB"
-        call save_matrix(suffix,mat1d=BB_R)
-   endif
-   
-   
-   if (index(get_oper_save_task, 'c') > 0) then
-        call get_CC_R
-        suffix="CC"
-        call save_matrix(suffix,mat2d=CC_R)
-   endif
+    if (index(get_oper_save_task, 'a') > 0) then
+      call get_AA_R
+      suffix = "AA"
+      call save_matrix(suffix, mat1d=AA_R)
+    endif
 
-   if (index(get_oper_save_task, 'f') > 0) then
-        call get_FF_R
-        suffix="FF"
-        call save_matrix(suffix,mat2d=FF_R)
-   endif
+    if (index(get_oper_save_task, 'b') > 0) then
+      call get_BB_R
+      suffix = "BB"
+      call save_matrix(suffix, mat1d=BB_R)
+    endif
 
-   if (spinors) then 
+    if (index(get_oper_save_task, 'c') > 0) then
+      call get_CC_R
+      suffix = "CC"
+      call save_matrix(suffix, mat2d=CC_R)
+    endif
 
-     if (index(get_oper_save_task, 's') > 0) then
+    if (index(get_oper_save_task, 'f') > 0) then
+      call get_FF_R
+      suffix = "FF"
+      call save_matrix(suffix, mat2d=FF_R)
+    endif
+
+    if (spinors) then
+
+      if (index(get_oper_save_task, 's') > 0) then
         call get_SS_R
-        suffix="SS"
-        call save_matrix(suffix,mat1d=SS_R)
-     endif
+        suffix = "SS"
+        call save_matrix(suffix, mat1d=SS_R)
+      endif
 
-     if (index(get_oper_save_task, 'h') > 0) then
+      if (index(get_oper_save_task, 'h') > 0) then
         call get_SHC_R
-        suffix="SR"
-        call save_matrix(suffix,mat2d=SR_R)
-        suffix="SHR"
-        call save_matrix(suffix,mat2d=SHR_R)
-        suffix="SH"
-        call save_matrix(suffix,mat1d=SH_R)
-     endif
-   
-   endif ! spinors
+        suffix = "SR"
+        call save_matrix(suffix, mat2d=SR_R)
+        suffix = "SHR"
+        call save_matrix(suffix, mat2d=SHR_R)
+        suffix = "SH"
+        call save_matrix(suffix, mat1d=SH_R)
+      endif
 
+    endif ! spinors
 
-end subroutine get_oper_save_main
+  end subroutine get_oper_save_main
 
   !======================================================
   subroutine get_HH_R
@@ -307,7 +296,7 @@ end subroutine get_oper_save_main
         enddo
       enddo
     enddo
-    call fourier_q_to_R(HH_q, HH_R)
+    call fourier_q_to_R_FFT(HH_q, HH_R)
 
     ! Scissors correction for an insulator: shift conduction bands upwards by
     ! scissors_shift eV
@@ -327,7 +316,7 @@ end subroutine get_oper_save_main
           enddo
         enddo
       enddo
-      call fourier_q_to_R(sciss_q, sciss_R)
+      call fourier_q_to_R_FFT(sciss_q, sciss_R)
       do n = 1, num_wann
         sciss_R(n, n, rpt_origin) = sciss_R(n, n, rpt_origin) + 1.0_dp
       end do
@@ -574,9 +563,9 @@ end subroutine get_oper_save_main
 
       close (mmn_in)
 
-      call fourier_q_to_R(AA_q(:, :, :, 1), AA_R(:, :, :, 1))
-      call fourier_q_to_R(AA_q(:, :, :, 2), AA_R(:, :, :, 2))
-      call fourier_q_to_R(AA_q(:, :, :, 3), AA_R(:, :, :, 3))
+      call fourier_q_to_R_FFT(AA_q(:, :, :, 1), AA_R(:, :, :, 1))
+      call fourier_q_to_R_FFT(AA_q(:, :, :, 2), AA_R(:, :, :, 2))
+      call fourier_q_to_R_FFT(AA_q(:, :, :, 3), AA_R(:, :, :, 3))
 
     endif !on_root
 
@@ -721,9 +710,9 @@ end subroutine get_oper_save_main
 
       close (mmn_in)
 
-      call fourier_q_to_R(BB_q(:, :, :, 1), BB_R(:, :, :, 1))
-      call fourier_q_to_R(BB_q(:, :, :, 2), BB_R(:, :, :, 2))
-      call fourier_q_to_R(BB_q(:, :, :, 3), BB_R(:, :, :, 3))
+      call fourier_q_to_R_FFT(BB_q(:, :, :, 1), BB_R(:, :, :, 1))
+      call fourier_q_to_R_FFT(BB_q(:, :, :, 2), BB_R(:, :, :, 2))
+      call fourier_q_to_R_FFT(BB_q(:, :, :, 3), BB_R(:, :, :, 3))
 
     endif !on_root
 
@@ -880,7 +869,7 @@ end subroutine get_oper_save_main
 
       do b = 1, 3
         do a = 1, 3
-          call fourier_q_to_R(CC_q(:, :, :, a, b), CC_R(:, :, :, a, b))
+          call fourier_q_to_R_FFT(CC_q(:, :, :, a, b), CC_R(:, :, :, a, b))
         enddo
       enddo
 
@@ -1028,7 +1017,7 @@ end subroutine get_oper_save_main
 
       do b = 1, 3
         do a = 1, 3
-          call fourier_q_to_R(FF_q(:, :, :, a, b), FF_R(:, :, :, a, b))
+          call fourier_q_to_R_FFT(FF_q(:, :, :, a, b), FF_R(:, :, :, a, b))
         enddo
       enddo
 
@@ -1172,9 +1161,9 @@ end subroutine get_oper_save_main
         enddo !is
       enddo !ik
 
-      call fourier_q_to_R(SS_q(:, :, :, 1), SS_R(:, :, :, 1))
-      call fourier_q_to_R(SS_q(:, :, :, 2), SS_R(:, :, :, 2))
-      call fourier_q_to_R(SS_q(:, :, :, 3), SS_R(:, :, :, 3))
+      call fourier_q_to_R_FFT(SS_q(:, :, :, 1), SS_R(:, :, :, 1))
+      call fourier_q_to_R_FFT(SS_q(:, :, :, 2), SS_R(:, :, :, 2))
+      call fourier_q_to_R_FFT(SS_q(:, :, :, 3), SS_R(:, :, :, 3))
 
     endif !on_root
 
@@ -1510,12 +1499,12 @@ end subroutine get_oper_save_main
 
       do is = 1, 3
         ! QZYZ18 Eq.(46)
-        call fourier_q_to_R(SH_q(:, :, :, is), SH_R(:, :, :, is))
+        call fourier_q_to_R_FFT(SH_q(:, :, :, is), SH_R(:, :, :, is))
         do idir = 1, 3
           ! QZYZ18 Eq.(44)
-          call fourier_q_to_R(SR_q(:, :, :, is, idir), SR_R(:, :, :, is, idir))
+          call fourier_q_to_R_FFT(SR_q(:, :, :, is, idir), SR_R(:, :, :, is, idir))
           ! QZYZ18 Eq.(45)
-          call fourier_q_to_R(SHR_q(:, :, :, is, idir), SHR_R(:, :, :, is, idir))
+          call fourier_q_to_R_FFT(SHR_q(:, :, :, is, idir), SHR_R(:, :, :, is, idir))
         end do
       end do
       SR_R = cmplx_i*SR_R
@@ -1547,6 +1536,7 @@ end subroutine get_oper_save_main
   !                   PRIVATE PROCEDURES                    !
   !=========================================================!
 
+! Not used anymore, replaced by FFT version
   !=========================================================!
   subroutine fourier_q_to_R(op_q, op_R)
     !==========================================================
@@ -1586,6 +1576,72 @@ end subroutine get_oper_save_main
     op_R = op_R/real(num_kpts, dp)
 
   end subroutine fourier_q_to_R
+
+!! FFT wrapper  by Stepan Tsirkin
+  !=========================================================!
+  subroutine fourier_q_to_R_fft(op_q, op_R)
+    !==========================================================
+    !
+    !! Fourier transforms Wannier-gauge representation
+    !! of an element _ij of a given operator O from q-space to R-space:
+    !!  using FFT (So far not. just for testing. FFT to be done)
+    !! O_ij(q) --> O_ij(R) = (1/N_kpts) sum_q e^{-iqR} O_ij(q)
+    !
+    !==========================================================
+
+    use w90_constants, only: dp, cmplx_0, cmplx_i, twopi
+    use w90_parameters, only: num_kpts, kpt_latt, mp_grid, num_wann
+    use w90_postw90_common, only: nrpts, irvec
+
+    implicit none
+
+!    include "fftw3.f90"
+
+    integer(kind=4), parameter :: fftw_forward = -1
+    integer(kind=4), parameter :: fftw_estimate = 64
+    integer(kind=8) plan
+
+    ! Arguments
+    !
+    complex(kind=dp), dimension(:, :, :), intent(in)  :: op_q
+    !! Operator in q-space
+    complex(kind=dp), dimension(:, :, :), intent(out) :: op_R
+    !! Operator in R-space
+
+    integer          :: ir, ik, ind(3), j, m, n
+    complex(kind=dp), dimension(:, :, :, :, :), allocatable :: op_grid
+
+    allocate (op_grid(num_wann, num_wann, mp_grid(1), mp_grid(2), mp_grid(3)))
+
+    do ik = 1, num_kpts
+      ind = NINT(kpt_latt(:, ik)*mp_grid + 1)
+!      write (*, *) 'k=', kpt_latt, '  ind=', ind
+      op_grid(:, :, ind(1), ind(2), ind(3)) = op_q(:, :, ik)
+    enddo
+
+    do m = 1, num_wann
+      do n = 1, num_wann
+        call dfftw_plan_dft_3d(plan, mp_grid(1), mp_grid(1), mp_grid(1), &
+                               op_grid(m, n, :, :, :), op_grid(m, n, :, :, :), FFTW_FORWARD, FFTW_ESTIMATE)
+        call dfftw_execute_dft(plan, op_grid(m, n, :, :, :), op_grid(m, n, :, :, :))
+        call dfftw_destroy_plan(plan)
+      enddo
+    enddo
+
+    do ir = 1, nrpts
+      ind = irvec(:, ir)
+      do j = 1, 3
+        if (ind(j) < 0) then
+          ind(j) = ind(j) + mp_grid(j)
+        endif
+      enddo
+      ind = ind + 1
+!      write (*, *) 'r=', irvec(:, ir), '  ind=', ind
+      op_R(:, :, ir) = op_grid(:, :, ind(1), ind(2), ind(3))
+    enddo
+    op_R = op_R/real(num_kpts, dp)
+
+  end subroutine fourier_q_to_R_fft
 
   !===============================================
   subroutine get_win_min(ik, win_min)
@@ -1657,10 +1713,9 @@ end subroutine get_oper_save_main
                         S, eigval(wm_a:wm_a + ns_a - 1, ik_a), H)
   end subroutine get_gauge_overlap_matrix
 
-
   !==========================================================
-   subroutine save_matrix(file_suffix,mat0d,mat1d,mat2d)
-  !==========================================================
+  subroutine save_matrix(file_suffix, mat0d, mat1d, mat2d)
+    !==========================================================
 
     use w90_constants, only: dp
     use w90_io, only: io_error, stdout, io_stopwatch, &
@@ -1668,46 +1723,41 @@ end subroutine get_oper_save_main
     use w90_parameters, only: num_wann
     use w90_comms, only: on_root, comms_bcast
 
-
-    complex(kind=dp), dimension(:, :,:), intent(in), optional :: mat0d
-    complex(kind=dp), dimension(:, :,:,:), intent(in), optional :: mat1d
-    complex(kind=dp), dimension(:, :,:,:,:), intent(in), optional :: mat2d
+    complex(kind=dp), dimension(:, :, :), intent(in), optional :: mat0d
+    complex(kind=dp), dimension(:, :, :, :), intent(in), optional :: mat1d
+    complex(kind=dp), dimension(:, :, :, :, :), intent(in), optional :: mat2d
     character(len=10), intent(in) :: file_suffix
-   
-    integer :: i,j,m,n,file_unit
+
+    integer :: i, j, m, n, file_unit
     character(len=120) :: file_name
 
-
-
     if (on_root) then
-    
-    file_name=trim(seedname)//"_"//trim(file_suffix)//'_R.dat'
-    write (stdout, '(/a)') ' writing to file  ' &
-          //file_name
-    file_unit = io_file_unit()
-    open (file_unit, file=trim(file_name), form='unformatted', status='unknown')
-   
-    do m=1,num_wann
-       do n=1,num_wann
-         if (present(mat0d)) then
-            write(file_unit) mat0d(m,n,:)
-         elseif (present(mat1d)) then
-            write(file_unit) mat1d(m,n,:,:)
-         elseif (present(mat2d)) then
-            write(file_unit) mat2d(m,n,:,:,:)
-         else 
-            call io_error ("get_oper :: save_matrix "" no matrix given for saving")
-         endif
-       enddo
-    enddo
-    
-    close(file_unit)
-    
-    endif ! on_root
-    
-    
-   end subroutine save_matrix
-  !==========================================================
 
+      file_name = trim(seedname)//"_"//trim(file_suffix)//'_R.dat'
+      write (stdout, '(/a)') ' writing to file  ' &
+        //file_name
+      file_unit = io_file_unit()
+      open (file_unit, file=trim(file_name), form='unformatted', status='unknown')
+
+      do m = 1, num_wann
+        do n = 1, num_wann
+          if (present(mat0d)) then
+            write (file_unit) mat0d(m, n, :)
+          elseif (present(mat1d)) then
+            write (file_unit) mat1d(m, n, :, :)
+          elseif (present(mat2d)) then
+            write (file_unit) mat2d(m, n, :, :, :)
+          else
+            call io_error("get_oper :: save_matrix "" no matrix given for saving")
+          endif
+        enddo
+      enddo
+
+      close (file_unit)
+
+    endif ! on_root
+
+  end subroutine save_matrix
+  !==========================================================
 
 end module w90_get_oper
