@@ -1619,14 +1619,14 @@ contains
       op_grid(:, :, ind(1), ind(2), ind(3)) = op_q(:, :, ik)
     enddo
 
+    call dfftw_plan_dft_3d(plan, mp_grid(1), mp_grid(1), mp_grid(1), &
+                           op_grid(1, 1, :, :, :), op_grid(1, 1, :, :, :), FFTW_FORWARD, FFTW_ESTIMATE)
     do m = 1, num_wann
       do n = 1, num_wann
-        call dfftw_plan_dft_3d(plan, mp_grid(1), mp_grid(1), mp_grid(1), &
-                               op_grid(m, n, :, :, :), op_grid(m, n, :, :, :), FFTW_FORWARD, FFTW_ESTIMATE)
         call dfftw_execute_dft(plan, op_grid(m, n, :, :, :), op_grid(m, n, :, :, :))
-        call dfftw_destroy_plan(plan)
       enddo
     enddo
+    call dfftw_destroy_plan(plan)
 
     do ir = 1, nrpts
       ind = irvec(:, ir)
