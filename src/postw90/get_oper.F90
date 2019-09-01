@@ -26,7 +26,7 @@ module w90_get_oper
 
   public
 
-  private :: fourier_q_to_R, get_win_min
+  private :: fourier_q_to_R, fourier_q_to_R_FFT, fourier_q_to_R_FFT_1, get_win_min
 
   complex(kind=dp), allocatable, save :: HH_R(:, :, :) !  <0n|r|Rm>
   !! $$\langle 0n | H | Rm \rangle$$
@@ -208,7 +208,7 @@ contains
         enddo
       enddo
     enddo
-    call fourier_q_to_R(HH_q, HH_R)
+    call fourier_q_to_R_FFT(HH_q, HH_R)
 
     ! Scissors correction for an insulator: shift conduction bands upwards by
     ! scissors_shift eV
@@ -228,7 +228,7 @@ contains
           enddo
         enddo
       enddo
-      call fourier_q_to_R(sciss_q, sciss_R)
+      call fourier_q_to_R_FFT(sciss_q, sciss_R)
       do n = 1, num_wann
         sciss_R(n, n, rpt_origin) = sciss_R(n, n, rpt_origin) + 1.0_dp
       end do
@@ -475,9 +475,9 @@ contains
 
       close (mmn_in)
 
-      call fourier_q_to_R(AA_q(:, :, :, 1), AA_R(:, :, :, 1))
-      call fourier_q_to_R(AA_q(:, :, :, 2), AA_R(:, :, :, 2))
-      call fourier_q_to_R(AA_q(:, :, :, 3), AA_R(:, :, :, 3))
+      call fourier_q_to_R_FFT(AA_q(:, :, :, 1), AA_R(:, :, :, 1))
+      call fourier_q_to_R_FFT(AA_q(:, :, :, 2), AA_R(:, :, :, 2))
+      call fourier_q_to_R_FFT(AA_q(:, :, :, 3), AA_R(:, :, :, 3))
 
     endif !on_root
 
@@ -622,9 +622,9 @@ contains
 
       close (mmn_in)
 
-      call fourier_q_to_R(BB_q(:, :, :, 1), BB_R(:, :, :, 1))
-      call fourier_q_to_R(BB_q(:, :, :, 2), BB_R(:, :, :, 2))
-      call fourier_q_to_R(BB_q(:, :, :, 3), BB_R(:, :, :, 3))
+      call fourier_q_to_R_FFT(BB_q(:, :, :, 1), BB_R(:, :, :, 1))
+      call fourier_q_to_R_FFT(BB_q(:, :, :, 2), BB_R(:, :, :, 2))
+      call fourier_q_to_R_FFT(BB_q(:, :, :, 3), BB_R(:, :, :, 3))
 
     endif !on_root
 
@@ -781,7 +781,7 @@ contains
 
       do b = 1, 3
         do a = 1, 3
-          call fourier_q_to_R(CC_q(:, :, :, a, b), CC_R(:, :, :, a, b))
+          call fourier_q_to_R_FFT(CC_q(:, :, :, a, b), CC_R(:, :, :, a, b))
         enddo
       enddo
 
@@ -929,7 +929,7 @@ contains
 
       do b = 1, 3
         do a = 1, 3
-          call fourier_q_to_R(FF_q(:, :, :, a, b), FF_R(:, :, :, a, b))
+          call fourier_q_to_R_FFT(FF_q(:, :, :, a, b), FF_R(:, :, :, a, b))
         enddo
       enddo
 
@@ -1073,9 +1073,9 @@ contains
         enddo !is
       enddo !ik
 
-      call fourier_q_to_R(SS_q(:, :, :, 1), SS_R(:, :, :, 1))
-      call fourier_q_to_R(SS_q(:, :, :, 2), SS_R(:, :, :, 2))
-      call fourier_q_to_R(SS_q(:, :, :, 3), SS_R(:, :, :, 3))
+      call fourier_q_to_R_FFT(SS_q(:, :, :, 1), SS_R(:, :, :, 1))
+      call fourier_q_to_R_FFT(SS_q(:, :, :, 2), SS_R(:, :, :, 2))
+      call fourier_q_to_R_FFT(SS_q(:, :, :, 3), SS_R(:, :, :, 3))
 
     endif !on_root
 
@@ -1411,12 +1411,12 @@ contains
 
       do is = 1, 3
         ! QZYZ18 Eq.(46)
-        call fourier_q_to_R(SH_q(:, :, :, is), SH_R(:, :, :, is))
+        call fourier_q_to_R_FFT(SH_q(:, :, :, is), SH_R(:, :, :, is))
         do idir = 1, 3
           ! QZYZ18 Eq.(44)
-          call fourier_q_to_R(SR_q(:, :, :, is, idir), SR_R(:, :, :, is, idir))
+          call fourier_q_to_R_FFT(SR_q(:, :, :, is, idir), SR_R(:, :, :, is, idir))
           ! QZYZ18 Eq.(45)
-          call fourier_q_to_R(SHR_q(:, :, :, is, idir), SHR_R(:, :, :, is, idir))
+          call fourier_q_to_R_FFT(SHR_q(:, :, :, is, idir), SHR_R(:, :, :, is, idir))
         end do
       end do
       SR_R = cmplx_i*SR_R
@@ -1487,6 +1487,101 @@ contains
     op_R = op_R/real(num_kpts, dp)
 
   end subroutine fourier_q_to_R
+
+  !=========================================================!
+  subroutine fourier_q_to_R_fft(op_q, op_R)
+    !==========================================================
+    !
+    !! Fourier transforms Wannier-gauge representation
+    !! of a given operator O from q-space to R-space:
+    !! Using FFT
+    !! O_ij(q) --> O_ij(R) = (1/N_kpts) sum_q e^{-iqR} O_ij(q)
+    !
+    !==========================================================
+
+    use w90_parameters, only: num_wann
+
+    implicit none
+
+    ! Arguments
+    !
+    complex(kind=dp), dimension(:, :, :), intent(in)  :: op_q
+    !! Operator in q-space
+    complex(kind=dp), dimension(:, :, :), intent(out) :: op_R
+    !! Operator in R-space
+
+    integer          :: m, n
+
+    do m = 1, num_wann
+      do n = 1, num_wann
+        call fourier_q_to_R_fft_1(op_q(m, n, :), op_R(m, n, :))
+      enddo
+    enddo
+
+  end subroutine fourier_q_to_R_fft
+
+  !=========================================================!
+  subroutine fourier_q_to_R_fft_1(op_q, op_R)
+    !==========================================================
+    !
+    !! Fourier transforms Wannier-gauge representation
+    !! of an element _ij of a given operator O from q-space to R-space:
+    !!  using FFT (So far not. just for testing. FFT to be done)
+    !! O_ij(q) --> O_ij(R) = (1/N_kpts) sum_q e^{-iqR} O_ij(q)
+    !
+    !==========================================================
+
+    use w90_constants, only: dp, cmplx_0, cmplx_i, twopi
+    use w90_parameters, only: num_kpts, kpt_latt, mp_grid
+    use w90_postw90_common, only: nrpts, irvec
+
+    implicit none
+
+!    include "fftw3.f90"
+
+    integer(kind=4), parameter :: fftw_forward = -1
+    integer(kind=4), parameter :: fftw_estimate = 64
+    integer(kind=8) plan
+
+    ! Arguments
+    !
+    complex(kind=dp), dimension(:), intent(in)  :: op_q
+    !! Operator in q-space
+    complex(kind=dp), dimension(:), intent(out) :: op_R
+    !! Operator in R-space
+
+    integer          :: ir, ik, ind(3), j
+    real(kind=dp)    :: rdotq
+    complex(kind=dp) :: phase_fac
+    complex(kind=dp), dimension(:, :, :), allocatable :: op_grid
+
+    allocate (op_grid(mp_grid(1), mp_grid(2), mp_grid(3)))
+
+    do ik = 1, num_kpts
+      ind = NINT(kpt_latt(:, ik)*mp_grid + 1)
+      write (*, *) 'k=', kpt_latt, '  ind=', ind
+      op_grid(ind(1), ind(2), ind(3)) = op_q(ik)
+    enddo
+
+    call dfftw_plan_dft_3d(plan, mp_grid(1), mp_grid(1), mp_grid(1), &
+                           op_grid, op_grid, FFTW_FORWARD, FFTW_ESTIMATE)
+    call dfftw_execute_dft(plan, op_grid, op_grid)
+    call dfftw_destroy_plan(plan)
+
+    do ir = 1, nrpts
+      ind = irvec(:, ir)
+      do j = 1, 3
+        if (ind(j) < 0) then
+          ind(j) = ind(j) + mp_grid(j)
+        endif
+      enddo
+      ind = ind + 1
+      write (*, *) 'r=', irvec(:, ir), '  ind=', ind
+      op_R(ir) = op_grid(ind(1), ind(2), ind(3))
+    enddo
+    op_R = op_R/real(num_kpts, dp)
+
+  end subroutine fourier_q_to_R_fft_1
 
   !===============================================
   subroutine get_win_min(ik, win_min)
