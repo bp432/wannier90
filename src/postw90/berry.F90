@@ -858,6 +858,7 @@ contains
           file_unit = io_file_unit()
           open (file_unit, FILE=file_name, STATUS='UNKNOWN', FORM='FORMATTED')
         endif
+
         do if = 1, nfermi
           LCtil_list(:, :, if) = (img_list(:, :, if) &
                                   - fermi_energy_list(if)*imf_list2(:, :, if))*fac
@@ -870,7 +871,59 @@ contains
           write (stdout, '(/,/,1x,a,F12.6)') 'Fermi energy (ev) =', &
             fermi_energy_list(if)
           write (stdout, '(/,/,1x,a)') &
-            'M_orb (bohr magn/cell)        x          y          z'
+            'M_orb (bohr magn/cell)            x              y              z'
+
+          if (iprint > 2) then
+
+            write (stdout, '(1x,a22,2x,3(f14.8,1x))') &
+              'imf (J0):', imf_list2(1, :, if)*fac
+            write (stdout, '(1x,a22,2x,3(f14.8,1x))') &
+              'imf (J1):', imf_list2(2, :, if)*fac
+            write (stdout, '(1x,a22,2x,3(f14.8,1x))') &
+              'imf (J2):', imf_list2(3, :, if)*fac
+            write (stdout, '(1x,a22,2x,3(f14.8,1x))') &
+              'img (J0):', img_list(1, :, if)*fac
+            write (stdout, '(1x,a22,2x,3(f14.8,1x))') &
+              'img (J1):', img_list(2, :, if)*fac
+            write (stdout, '(1x,a22,2x,3(f14.8,1x))') &
+              'img (J2):', img_list(3, :, if)*fac
+            write (stdout, '(1x,a22,2x,3(f14.8,1x))') &
+              'imh (J0):', imh_list(1, :, if)*fac
+            write (stdout, '(1x,a22,2x,3(f14.8,1x))') &
+              'imh (J1):', imh_list(2, :, if)*fac
+            write (stdout, '(1x,a22,2x,3(f14.8,1x))') &
+              'imh (J2):', imh_list(3, :, if)*fac
+
+            write (stdout, '(1x,a)') &
+              '======================'
+            write (stdout, '(1x,a22,2x,3(f10.4,1x))') &
+              'Local circulation (J0):', LCtil_list(1, :, if)
+            write (stdout, '(1x,a22,2x,3(f10.4,1x))') &
+              'Local circulation (J1):', LCtil_list(1, :, if)
+            write (stdout, '(1x,a22,2x,3(f10.4,1x))') &
+              'Local circulation (J2):', LCtil_list(1, :, if)
+            write (stdout, '(1x,a22,2x,3(f10.4,1x))') &
+              'Local circulation (tot):', &
+              sum(LCtil_list(1:3, 1, if)), sum(LCtil_list(1:3, 2, if)), &
+              sum(LCtil_list(1:3, 3, if))
+
+            write (stdout, '(1x,a22,2x,3(f10.4,1x))') &
+              'Itinerant circulation (J0):', ICtil_list(1, :, if)
+            write (stdout, '(1x,a22,2x,3(f10.4,1x))') &
+              'Itinerant circulation (J0):', ICtil_list(2, :, if)
+            write (stdout, '(1x,a22,2x,3(f10.4,1x))') &
+              'Itinerant circulation (J0):', ICtil_list(3, :, if)
+            write (stdout, '(1x,a22,2x,3(f10.4,1x))') &
+              'Itinerant circulation (tot):', &
+              sum(ICtil_list(1:3, 1, if)), sum(ICtil_list(1:3, 2, if)), &
+              sum(ICtil_list(1:3, 3, if))
+            write (stdout, '(1x,a)') &
+              '--------------------------------------------------------'
+            write (stdout, '(1x,a22,2x,3(f10.4,1x),/)') 'Total   :', &
+              sum(Morb_list(1:3, 1, if)), sum(Morb_list(1:3, 2, if)), &
+              sum(Morb_list(1:3, 3, if))
+          endif
+
           if (iprint > 1) then
             write (stdout, '(1x,a)') &
               '======================'
