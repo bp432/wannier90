@@ -1176,7 +1176,6 @@ contains
         .and. index(berry_task, 'shc') == 0) call io_error &
       ('Error: value of berry_task not recognised in param_read')
 
-
     get_oper_save = .false.
     call param_get_keyword('get_oper_save', found, l_value=get_oper_save)
     get_oper_save_task = 'h'
@@ -2228,7 +2227,6 @@ contains
     ! Projections
     auto_projections = .false.
     call param_get_keyword('auto_projections', found, l_value=auto_projections)
-    if (auto_projections .and. spinors) call io_error('Error: Cannot automatically generate spinor projections.')
     num_proj = 0
     call param_get_block_length('projections', found, i_temp)
     ! check to see that there are no unrecognised keywords
@@ -3303,7 +3301,7 @@ contains
       call parameters_gyro_write_task(gyrotropic_task, '-c', 'calculate the C tensor')
       call parameters_gyro_write_task(gyrotropic_task, '-k', 'calculate the K tensor')
       call parameters_gyro_write_task(gyrotropic_task, &
-                '-dahc', 'calculate derivative of AHC over Ef  ')
+                                      '-dahc', 'calculate derivative of AHC over Ef  ')
       call parameters_gyro_write_task(gyrotropic_task, '-noa', 'calculate the interbad natural optical activity')
       call parameters_gyro_write_task(gyrotropic_task, '-dos', 'calculate the density of states')
 
@@ -3448,13 +3446,10 @@ contains
     write (stdout, *) '            |                                                   |'
     write (stdout, *) '            |  Please cite                                      |'
     write (stdout, *) '            |                                                   |'
-    write (stdout, *) '            |  [ref] "An updated version of Wannier90:          |'
-    write (stdout, *) '            |        A Tool for Obtaining Maximally Localised   |'
-    write (stdout, *) '            |        Wannier Functions", A. A. Mostofi,         |'
-    write (stdout, *) '            |        J. R. Yates, G. Pizzi, Y. S. Lee,          |'
-    write (stdout, *) '            |        I. Souza, D. Vanderbilt and N. Marzari,    |'
-    write (stdout, *) '            |        Comput. Phys. Commun. 185, 2309 (2014)     |'
-    write (stdout, *) '            |        http://dx.doi.org/10.1016/j.cpc.2014.05.003|'
+    write (stdout, *) '            |  [ref] "Wannier90 as a community code:            |'
+    write (stdout, *) '            |        new features and applications",            |'
+    write (stdout, *) '            |        G. Pizzi et al., arXiv:1907:09788 (2019)   |'
+    write (stdout, *) '            |        https://arxiv.org/abs/1907.09788           |'
     write (stdout, *) '            |                                                   |'
     write (stdout, *) '            |  in any publications arising from the use of      |'
     write (stdout, *) '            |  this code. For the method please cite            |'
@@ -3775,6 +3770,9 @@ contains
     !! Write checkpoint file
     !! IMPORTANT! If you change the chkpt format, adapt
     !! accordingly also the w90chk2chk.x utility!
+    !! Also, note that this routine writes the u_matrix and the m_matrix - in parallel
+    !! mode these are however stored in distributed form in, e.g., u_matrix_loc only, so
+    !! if you are changing the u_matrix, remember to gather it from u_matrix_loc first!
     !=================================================!
 
     use w90_io, only: io_file_unit, io_date, seedname
