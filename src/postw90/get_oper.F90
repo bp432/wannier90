@@ -26,7 +26,7 @@ module w90_get_oper
 
   public
 
-  private :: fourier_q_to_R, fourier_q_to_R_FFT, fourier_q_to_R_FFT_1, get_win_min
+  private :: fourier_q_to_R, fourier_q_to_R_FFT, get_win_min
 
   complex(kind=dp), allocatable, save :: HH_R(:, :, :) !  <0n|r|Rm>
   !! $$\langle 0n | H | Rm \rangle$$
@@ -1448,6 +1448,7 @@ contains
   !                   PRIVATE PROCEDURES                    !
   !=========================================================!
 
+! Not used anymore, replaced by FFT version
   !=========================================================!
   subroutine fourier_q_to_R(op_q, op_R)
     !==========================================================
@@ -1488,40 +1489,9 @@ contains
 
   end subroutine fourier_q_to_R
 
+!! FFT wrapper  by Stepan Tsirkin
   !=========================================================!
   subroutine fourier_q_to_R_fft(op_q, op_R)
-    !==========================================================
-    !
-    !! Fourier transforms Wannier-gauge representation
-    !! of a given operator O from q-space to R-space:
-    !! Using FFT
-    !! O_ij(q) --> O_ij(R) = (1/N_kpts) sum_q e^{-iqR} O_ij(q)
-    !
-    !==========================================================
-
-    use w90_parameters, only: num_wann
-
-    implicit none
-
-    ! Arguments
-    !
-    complex(kind=dp), dimension(:, :, :), intent(in)  :: op_q
-    !! Operator in q-space
-    complex(kind=dp), dimension(:, :, :), intent(out) :: op_R
-    !! Operator in R-space
-
-    integer          :: m, n
-
-    do m = 1, num_wann
-      do n = 1, num_wann
-        call fourier_q_to_R_fft_1(op_q(m, n, :), op_R(m, n, :))
-      enddo
-    enddo
-
-  end subroutine fourier_q_to_R_fft
-
-  !=========================================================!
-  subroutine fourier_q_to_R_fft_1(op_q, op_R)
     !==========================================================
     !
     !! Fourier transforms Wannier-gauge representation
@@ -1532,7 +1502,7 @@ contains
     !==========================================================
 
     use w90_constants, only: dp, cmplx_0, cmplx_i, twopi
-    use w90_parameters, only: num_kpts, kpt_latt, mp_grid
+    use w90_parameters, only: num_kpts, kpt_latt, mp_grid, num_wann
     use w90_postw90_common, only: nrpts, irvec
 
     implicit none
@@ -1545,28 +1515,30 @@ contains
 
     ! Arguments
     !
-    complex(kind=dp), dimension(:), intent(in)  :: op_q
+    complex(kind=dp), dimension(:, :, :), intent(in)  :: op_q
     !! Operator in q-space
-    complex(kind=dp), dimension(:), intent(out) :: op_R
+    complex(kind=dp), dimension(:, :, :), intent(out) :: op_R
     !! Operator in R-space
 
-    integer          :: ir, ik, ind(3), j
-    real(kind=dp)    :: rdotq
-    complex(kind=dp) :: phase_fac
-    complex(kind=dp), dimension(:, :, :), allocatable :: op_grid
+    integer          :: ir, ik, ind(3), j, m, n
+    complex(kind=dp), dimension(:, :, :, :, :), allocatable :: op_grid
 
-    allocate (op_grid(mp_grid(1), mp_grid(2), mp_grid(3)))
+    allocate (op_grid(num_wann, num_wann, mp_grid(1), mp_grid(2), mp_grid(3)))
 
     do ik = 1, num_kpts
       ind = NINT(kpt_latt(:, ik)*mp_grid + 1)
-      write (*, *) 'k=', kpt_latt, '  ind=', ind
-      op_grid(ind(1), ind(2), ind(3)) = op_q(ik)
+!      write (*, *) 'k=', kpt_latt, '  ind=', ind
+      op_grid(:, :, ind(1), ind(2), ind(3)) = op_q(:, :, ik)
     enddo
 
-    call dfftw_plan_dft_3d(plan, mp_grid(1), mp_grid(1), mp_grid(1), &
-                           op_grid, op_grid, FFTW_FORWARD, FFTW_ESTIMATE)
-    call dfftw_execute_dft(plan, op_grid, op_grid)
-    call dfftw_destroy_plan(plan)
+    do m = 1, num_wann
+      do n = 1, num_wann
+        call dfftw_plan_dft_3d(plan, mp_grid(1), mp_grid(1), mp_grid(1), &
+                               op_grid(m, n, :, :, :), op_grid(m, n, :, :, :), FFTW_FORWARD, FFTW_ESTIMATE)
+        call dfftw_execute_dft(plan, op_grid(m, n, :, :, :), op_grid(m, n, :, :, :))
+        call dfftw_destroy_plan(plan)
+      enddo
+    enddo
 
     do ir = 1, nrpts
       ind = irvec(:, ir)
@@ -1576,12 +1548,12 @@ contains
         endif
       enddo
       ind = ind + 1
-      write (*, *) 'r=', irvec(:, ir), '  ind=', ind
-      op_R(ir) = op_grid(ind(1), ind(2), ind(3))
+!      write (*, *) 'r=', irvec(:, ir), '  ind=', ind
+      op_R(:, :, ir) = op_grid(:, :, ind(1), ind(2), ind(3))
     enddo
     op_R = op_R/real(num_kpts, dp)
 
-  end subroutine fourier_q_to_R_fft_1
+  end subroutine fourier_q_to_R_fft
 
   !===============================================
   subroutine get_win_min(ik, win_min)
