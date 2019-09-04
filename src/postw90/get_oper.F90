@@ -641,7 +641,7 @@ contains
   end subroutine get_BB_R
 
   !=============================================================
-  subroutine get_CC_R
+  subroutine get_CC_R(mode)
     !=============================================================
     !
     !! CC_ab(R) = <0|r_a.H.(r-R)_b|R> is the Fourier transform of
@@ -659,6 +659,8 @@ contains
       seedname
     use w90_comms, only: on_root, comms_bcast
 
+    character(len=3), optional, intent(in)  :: mode
+
     integer          :: i, j, ii, jj, m, n, a, b, nn1, nn2, ik, nb_tmp, nkp_tmp, &
                         nntot_tmp, uHu_in, qb1, qb2, winmin_qb1, winmin_qb2
 
@@ -668,15 +670,34 @@ contains
     complex(kind=dp), allocatable :: H_qb1_q_qb2(:, :)
     real(kind=dp)                 :: c_real, c_img
     character(len=60)             :: header
+    character(len=3)              :: mode_
+
+    if (present(mode)) then
+      mode_ = mode
+    else
+      mode_ = 'uHu'
+    endif
+
+    if (.not. ((mode_ == "uHu") .or. (mode_ == "uIu"))) &
+      call io_error('unknown mode_ in get_CC_R : '//mode_)
 
     if (timing_level > 1 .and. on_root) call io_stopwatch('get_oper: get_CC_R', 1)
 
-    if (.not. allocated(CC_R)) then
-      allocate (CC_R(num_wann, num_wann, nrpts, 3, 3))
-    else
-      if (timing_level > 1 .and. on_root) call io_stopwatch('get_oper: get_CC_R', 2)
-      return
-    end if
+    if (mode_ == "uHu") then
+      if (.not. allocated(CC_R)) then
+        allocate (CC_R(num_wann, num_wann, nrpts, 3, 3))
+      else
+        if (timing_level > 1 .and. on_root) call io_stopwatch('get_oper: get_CC_R', 2)
+        return
+      end if
+    elseif (mode_ == "uIu") then
+      if (.not. allocated(FF_R)) then
+        allocate (FF_R(num_wann, num_wann, nrpts, 3, 3))
+      else
+        if (timing_level > 1 .and. on_root) call io_stopwatch('get_oper: get_CC_R', 2)
+        return
+      end if
+    endif
 
     if (on_root) then
 
@@ -698,31 +719,31 @@ contains
 
       uHu_in = io_file_unit()
       if (uHu_formatted) then
-        open (unit=uHu_in, file=trim(seedname)//".uHu", form='formatted', &
+        open (unit=uHu_in, file=trim(seedname)//"."//mode_, form='formatted', &
               status='old', action='read', err=105)
         write (stdout, '(/a)', advance='no') &
-          ' Reading uHu overlaps from '//trim(seedname)//'.uHu in get_CC_R: '
+          ' Reading '//mode_//' overlaps from '//trim(seedname)//'.'//mode_//' in get_CC_R: '
         read (uHu_in, *, err=106, end=106) header
         write (stdout, '(a)') trim(header)
         read (uHu_in, *, err=106, end=106) nb_tmp, nkp_tmp, nntot_tmp
       else
-        open (unit=uHu_in, file=trim(seedname)//".uHu", form='unformatted', &
+        open (unit=uHu_in, file=trim(seedname)//"."//mode_, form='unformatted', &
               status='old', action='read', err=105)
         write (stdout, '(/a)', advance='no') &
-          ' Reading uHu overlaps from '//trim(seedname)//'.uHu in get_CC_R: '
+          ' Reading uHu overlaps from '//trim(seedname)//'.'//mode_//' in get_CC_R: '
         read (uHu_in, err=106, end=106) header
         write (stdout, '(a)') trim(header)
         read (uHu_in, err=106, end=106) nb_tmp, nkp_tmp, nntot_tmp
       endif
       if (nb_tmp .ne. num_bands) &
         call io_error &
-        (trim(seedname)//'.uHu has not the right number of bands')
+        (trim(seedname)//"."//mode_//' has not the right number of bands')
       if (nkp_tmp .ne. num_kpts) &
         call io_error &
-        (trim(seedname)//'.uHu has not the right number of k-points')
+        (trim(seedname)//"."//mode_//' has not the right number of k-points')
       if (nntot_tmp .ne. nntot) &
         call io_error &
-        (trim(seedname)//'.uHu has not the right number of nearest neighbours')
+        (trim(seedname)//"."//mode_//' has not the right number of nearest neighbours')
 
       CC_q = cmplx_0
       do ik = 1, num_kpts
@@ -734,6 +755,7 @@ contains
             call get_win_min(qb1, winmin_qb1)
             !
             ! Read from .uHu file the matrices <u_{q+b1}|H_q|u_{q+b2}>
+            ! or Read from .uIu file the matrices <u_{q+b1}|u_{q+b2}>
             ! between the original ab initio eigenstates
             !
             if (uHu_formatted) then
@@ -781,21 +803,29 @@ contains
 
       do b = 1, 3
         do a = 1, 3
-          call fourier_q_to_R(CC_q(:, :, :, a, b), CC_R(:, :, :, a, b))
+          if (mode_ == 'uHu') then
+            call fourier_q_to_R(CC_q(:, :, :, a, b), CC_R(:, :, :, a, b))
+          elseif (mode_ == 'uIu') then
+            call fourier_q_to_R(CC_q(:, :, :, a, b), FF_R(:, :, :, a, b))
+          endif
         enddo
       enddo
 
     endif !on_root
 
-    call comms_bcast(CC_R(1, 1, 1, 1, 1), num_wann*num_wann*nrpts*3*3)
+    if (mode_ == 'uHu') then
+      call comms_bcast(CC_R(1, 1, 1, 1, 1), num_wann*num_wann*nrpts*3*3)
+    elseif (mode_ == 'uIu') then
+      call comms_bcast(FF_R(1, 1, 1, 1, 1), num_wann*num_wann*nrpts*3*3)
+    endif
 
     if (timing_level > 1 .and. on_root) call io_stopwatch('get_oper: get_CC_R', 2)
     return
 
 105 call io_error &
-      ('Error: Problem opening input file '//trim(seedname)//'.uHu')
+      ('Error: Problem opening input file '//trim(seedname)//'.'//mode_)
 106 call io_error &
-      ('Error: Problem reading input file '//trim(seedname)//'.uHu')
+      ('Error: Problem reading input file '//trim(seedname)//'.'//mode_)
 
   end subroutine get_CC_R
 
@@ -808,142 +838,7 @@ contains
     !
     !===========================================================
 
-    use w90_constants, only: dp, cmplx_0
-    use w90_parameters, only: num_kpts, nntot, nnlist, num_wann, &
-      num_bands, ndimwin, wb, bk, &
-      have_disentangled, timing_level
-    use w90_postw90_common, only: nrpts, v_matrix
-    use w90_io, only: stdout, io_error, io_stopwatch, io_file_unit, &
-      seedname
-    use w90_comms, only: on_root, comms_bcast
-
-    integer          :: i, j, ii, jj, m, n, a, b, nn1, nn2, ik, nb_tmp, nkp_tmp, nntot_tmp, &
-                        uIu_in, qb1, qb2, winmin_qb1, winmin_qb2
-
-    integer, allocatable          :: num_states(:)
-    complex(kind=dp), allocatable :: FF_q(:, :, :, :, :)
-    complex(kind=dp), allocatable :: Lo_qb1_q_qb2(:, :)
-    complex(kind=dp), allocatable :: L_qb1_q_qb2(:, :)
-    character(len=60)             :: header
-
-    if (timing_level > 1 .and. on_root) call io_stopwatch('get_oper: get_FF_R', 1)
-
-    if (.not. allocated(FF_R)) then
-      allocate (FF_R(num_wann, num_wann, nrpts, 3, 3))
-    else
-      if (timing_level > 1 .and. on_root) call io_stopwatch('get_oper: get_FF_R', 2)
-      return
-    end if
-
-    if (on_root) then
-
-      allocate (Lo_qb1_q_qb2(num_bands, num_bands))
-      allocate (L_qb1_q_qb2(num_wann, num_wann))
-      allocate (FF_q(num_wann, num_wann, num_kpts, 3, 3))
-
-      allocate (num_states(num_kpts))
-      do ik = 1, num_kpts
-        if (have_disentangled) then
-          num_states(ik) = ndimwin(ik)
-        else
-          num_states(ik) = num_wann
-        endif
-      enddo
-
-      uIu_in = io_file_unit()
-      open (unit=uIu_in, file=TRIM(seedname)//".uIu", form='unformatted', &
-            status='old', action='read', err=107)
-      write (stdout, '(/a)', advance='no') &
-        ' Reading uIu overlaps from '//trim(seedname)//'.uIu in get_FF_R: '
-      read (uIu_in, err=108, end=108) header
-      write (stdout, '(a)') trim(header)
-      read (uIu_in, err=108, end=108) nb_tmp, nkp_tmp, nntot_tmp
-      if (nb_tmp .ne. num_bands) &
-        call io_error &
-        (trim(seedname)//'.uIu has not the right number of bands')
-      if (nkp_tmp .ne. num_kpts) &
-        call io_error &
-        (trim(seedname)//'.uIu has not the right number of k-points')
-      if (nntot_tmp .ne. nntot) &
-        call io_error &
-        (trim(seedname)//'.uIu has not the right number of nearest neighbours')
-
-      FF_q = cmplx_0
-      do ik = 1, num_kpts
-        do nn2 = 1, nntot
-          qb2 = nnlist(ik, nn2)
-          call get_win_min(qb2, winmin_qb2)
-          do nn1 = 1, nntot
-            qb1 = nnlist(ik, nn1)
-            call get_win_min(qb1, winmin_qb1)
-            !
-            ! Read from .uIu file the matrices <u_{q+b1}|u_{q+b2}>
-            ! between the original ab initio eigenstates
-            !
-            !               do m=1,num_bands
-            !                  do n=1,num_bands
-            !                     read(uIu_in,err=108,end=108) Lo_qb1_q_qb2(m,n)
-            !                  end do
-            !               end do
-            read (uIu_in, err=108, end=108) &
-              ((Lo_qb1_q_qb2(n, m), n=1, num_bands), m=1, num_bands)
-            !
-            ! **************************************************************
-            ! 2013-08-09: Do we need to take a transpose here?! SEE get_CC_R
-            Lo_qb1_q_qb2 = transpose(Lo_qb1_q_qb2) ! added 2013-08-09 (?)
-            ! **************************************************************
-            !
-            ! Transform to projected subspace, Wannier gauge
-            !
-            L_qb1_q_qb2(:, :) = cmplx_0
-            do m = 1, num_wann
-              do n = 1, num_wann
-                do i = 1, num_states(qb1)
-                  ii = winmin_qb1 + i - 1
-                  do j = 1, num_states(qb2)
-                    jj = winmin_qb2 + j - 1
-                    L_qb1_q_qb2(n, m) = L_qb1_q_qb2(n, m) &
-                                        + conjg(v_matrix(i, n, qb1)) &
-                                        *Lo_qb1_q_qb2(ii, jj) &
-                                        *v_matrix(j, m, qb2)
-                  enddo
-                enddo
-              enddo
-            enddo
-            do b = 1, 3
-              do a = 1, b
-                FF_q(:, :, ik, a, b) = FF_q(:, :, ik, a, b) + wb(nn1)*bk(a, nn1, ik) &
-                                       *wb(nn2)*bk(b, nn2, ik)*L_qb1_q_qb2(:, :)
-              enddo
-            enddo
-          enddo !nn1
-        enddo !nn2
-        do b = 1, 3
-          do a = 1, b
-            FF_q(:, :, ik, b, a) = conjg(transpose(FF_q(:, :, ik, a, b)))
-          enddo
-        enddo
-      enddo !ik
-
-      close (uIu_in)
-
-      do b = 1, 3
-        do a = 1, 3
-          call fourier_q_to_R(FF_q(:, :, :, a, b), FF_R(:, :, :, a, b))
-        enddo
-      enddo
-
-    endif !on_root
-
-    call comms_bcast(FF_R(1, 1, 1, 1, 1), num_wann*num_wann*nrpts*3*3)
-
-    if (timing_level > 1 .and. on_root) call io_stopwatch('get_oper: get_FF_R', 2)
-    return
-
-107 call io_error &
-      ('Error: Problem opening input file '//trim(seedname)//'.uIu')
-108 call io_error &
-      ('Error: Problem reading input file '//trim(seedname)//'.uIu')
+    call get_CC_R(mode='uIu')
 
   end subroutine get_FF_R
 
