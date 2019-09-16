@@ -1611,36 +1611,32 @@ contains
     integer          :: ir, ik, ind(3), j, m, n
     complex(kind=dp), dimension(:, :, :, :, :), allocatable :: op_grid
 
-    allocate (op_grid(num_wann, num_wann, mp_grid(1), mp_grid(2), mp_grid(3)))
+    op_R = 0
+    allocate (op_grid( mp_grid(1), mp_grid(2), mp_grid(3),num_wann, num_wann))
 
     do ik = 1, num_kpts
-      ind = NINT(kpt_latt(:, ik)*mp_grid + 1)
-!      write (*, *) 'k=', kpt_latt, '  ind=', ind
-      op_grid(:, :, ind(1), ind(2), ind(3)) = op_q(:, :, ik)
+      ind =  modulo( NINT(  kpt_latt(:, ik)*mp_grid ), mp_grid)+1 
+      op_grid(ind(1), ind(2), ind(3),:, : ) = op_q(:, :, ik)
     enddo
 
-    call dfftw_plan_dft_3d(plan, mp_grid(1), mp_grid(1), mp_grid(1), &
-                           op_grid(1, 1, :, :, :), op_grid(1, 1, :, :, :), FFTW_FORWARD, FFTW_ESTIMATE)
+
+
     do m = 1, num_wann
       do n = 1, num_wann
-        call dfftw_execute_dft(plan, op_grid(m, n, :, :, :), op_grid(m, n, :, :, :))
+        call dfftw_plan_dft_3d(plan, mp_grid(1), mp_grid(2), mp_grid(3), &
+                           op_grid( :, :, :,m,n), op_grid( :, :, :,m,n), FFTW_FORWARD, FFTW_ESTIMATE)
+        call dfftw_execute_dft(plan, op_grid( :, :, :,m,n), op_grid( :, :, :,m, n))
+        call dfftw_destroy_plan(plan)
       enddo
     enddo
-    call dfftw_destroy_plan(plan)
 
     do ir = 1, nrpts
-      ind = irvec(:, ir)
-      do j = 1, 3
-        if (ind(j) < 0) then
-          ind(j) = ind(j) + mp_grid(j)
-        endif
-      enddo
-      ind = ind + 1
-!      write (*, *) 'r=', irvec(:, ir), '  ind=', ind
-      op_R(:, :, ir) = op_grid(:, :, ind(1), ind(2), ind(3))
+      ind = modulo(irvec(:, ir),mp_grid)+1
+      op_R(:, :, ir) = op_grid( ind(1), ind(2), ind(3),:, :)
     enddo
+    
     op_R = op_R/real(num_kpts, dp)
-
+    
   end subroutine fourier_q_to_R_fft
 
   !===============================================
