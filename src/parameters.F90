@@ -189,6 +189,7 @@ module w90_parameters
 !  real(kind=dp),     public, save :: dos_gaussian_width
 
 ! Module  b e r r y
+  logical, public, save :: use_fft
   logical, public, save :: berry
   character(len=120), public, save :: berry_task
   real(kind=dp), public, save :: berry_kmesh_spacing
@@ -1163,6 +1164,11 @@ contains
 
     berry = .false.
     call param_get_keyword('berry', found, l_value=berry)
+
+
+    use_FFT = .true.
+    call param_get_keyword('use_fft', found, l_value=use_fft)
+
 
     transl_inv = .false.
     call param_get_keyword('transl_inv', found, l_value=transl_inv)
@@ -6170,6 +6176,7 @@ contains
     call comms_bcast(fermi_surface_plot_format, len(fermi_surface_plot_format))
     call comms_bcast(fermi_energy, 1) !! used?
 
+    call comms_bcast(use_fft, 1)
     call comms_bcast(berry, 1)
     call comms_bcast(berry_task, len(berry_task))
     call comms_bcast(berry_kmesh_spacing, 1)

@@ -296,7 +296,7 @@ contains
         enddo
       enddo
     enddo
-    call fourier_q_to_R_FFT(HH_q, HH_R)
+    call fourier_q_to_R(HH_q, HH_R)
 
     ! Scissors correction for an insulator: shift conduction bands upwards by
     ! scissors_shift eV
@@ -316,7 +316,7 @@ contains
           enddo
         enddo
       enddo
-      call fourier_q_to_R_FFT(sciss_q, sciss_R)
+      call fourier_q_to_R(sciss_q, sciss_R)
       do n = 1, num_wann
         sciss_R(n, n, rpt_origin) = sciss_R(n, n, rpt_origin) + 1.0_dp
       end do
@@ -563,9 +563,9 @@ contains
 
       close (mmn_in)
 
-      call fourier_q_to_R_FFT(AA_q(:, :, :, 1), AA_R(:, :, :, 1))
-      call fourier_q_to_R_FFT(AA_q(:, :, :, 2), AA_R(:, :, :, 2))
-      call fourier_q_to_R_FFT(AA_q(:, :, :, 3), AA_R(:, :, :, 3))
+      call fourier_q_to_R(AA_q(:, :, :, 1), AA_R(:, :, :, 1))
+      call fourier_q_to_R(AA_q(:, :, :, 2), AA_R(:, :, :, 2))
+      call fourier_q_to_R(AA_q(:, :, :, 3), AA_R(:, :, :, 3))
 
     endif !on_root
 
@@ -710,9 +710,9 @@ contains
 
       close (mmn_in)
 
-      call fourier_q_to_R_FFT(BB_q(:, :, :, 1), BB_R(:, :, :, 1))
-      call fourier_q_to_R_FFT(BB_q(:, :, :, 2), BB_R(:, :, :, 2))
-      call fourier_q_to_R_FFT(BB_q(:, :, :, 3), BB_R(:, :, :, 3))
+      call fourier_q_to_R(BB_q(:, :, :, 1), BB_R(:, :, :, 1))
+      call fourier_q_to_R(BB_q(:, :, :, 2), BB_R(:, :, :, 2))
+      call fourier_q_to_R(BB_q(:, :, :, 3), BB_R(:, :, :, 3))
 
     endif !on_root
 
@@ -869,7 +869,7 @@ contains
 
       do b = 1, 3
         do a = 1, 3
-          call fourier_q_to_R_FFT(CC_q(:, :, :, a, b), CC_R(:, :, :, a, b))
+          call fourier_q_to_R(CC_q(:, :, :, a, b), CC_R(:, :, :, a, b))
         enddo
       enddo
 
@@ -1017,7 +1017,7 @@ contains
 
       do b = 1, 3
         do a = 1, 3
-          call fourier_q_to_R_FFT(FF_q(:, :, :, a, b), FF_R(:, :, :, a, b))
+          call fourier_q_to_R(FF_q(:, :, :, a, b), FF_R(:, :, :, a, b))
         enddo
       enddo
 
@@ -1161,9 +1161,9 @@ contains
         enddo !is
       enddo !ik
 
-      call fourier_q_to_R_FFT(SS_q(:, :, :, 1), SS_R(:, :, :, 1))
-      call fourier_q_to_R_FFT(SS_q(:, :, :, 2), SS_R(:, :, :, 2))
-      call fourier_q_to_R_FFT(SS_q(:, :, :, 3), SS_R(:, :, :, 3))
+      call fourier_q_to_R(SS_q(:, :, :, 1), SS_R(:, :, :, 1))
+      call fourier_q_to_R(SS_q(:, :, :, 2), SS_R(:, :, :, 2))
+      call fourier_q_to_R(SS_q(:, :, :, 3), SS_R(:, :, :, 3))
 
     endif !on_root
 
@@ -1499,12 +1499,12 @@ contains
 
       do is = 1, 3
         ! QZYZ18 Eq.(46)
-        call fourier_q_to_R_FFT(SH_q(:, :, :, is), SH_R(:, :, :, is))
+        call fourier_q_to_R(SH_q(:, :, :, is), SH_R(:, :, :, is))
         do idir = 1, 3
           ! QZYZ18 Eq.(44)
-          call fourier_q_to_R_FFT(SR_q(:, :, :, is, idir), SR_R(:, :, :, is, idir))
+          call fourier_q_to_R(SR_q(:, :, :, is, idir), SR_R(:, :, :, is, idir))
           ! QZYZ18 Eq.(45)
-          call fourier_q_to_R_FFT(SHR_q(:, :, :, is, idir), SHR_R(:, :, :, is, idir))
+          call fourier_q_to_R(SHR_q(:, :, :, is, idir), SHR_R(:, :, :, is, idir))
         end do
       end do
       SR_R = cmplx_i*SR_R
@@ -1549,7 +1549,7 @@ contains
     !==========================================================
 
     use w90_constants, only: dp, cmplx_0, cmplx_i, twopi
-    use w90_parameters, only: num_kpts, kpt_latt
+    use w90_parameters, only: num_kpts, kpt_latt, use_fft
     use w90_postw90_common, only: nrpts, irvec
 
     implicit none
@@ -1565,6 +1565,11 @@ contains
     real(kind=dp)    :: rdotq
     complex(kind=dp) :: phase_fac
 
+    if (use_fft) then
+        call  fourier_q_to_R_FFT(op_q, op_R)
+        return
+    endif
+    
     op_R = cmplx_0
     do ir = 1, nrpts
       do ik = 1, num_kpts
