@@ -858,6 +858,7 @@ contains
           file_unit = io_file_unit()
           open (file_unit, FILE=file_name, STATUS='UNKNOWN', FORM='FORMATTED')
         endif
+
         do if = 1, nfermi
           LCtil_list(:, :, if) = (img_list(:, :, if) &
                                   - fermi_energy_list(if)*imf_list2(:, :, if))*fac
