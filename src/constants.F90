@@ -139,7 +139,7 @@ module w90_constants
 
 #ifdef USE_WANNIER90_V1_BOHR
 !#warning "WANNIER90 INFO: Using WANNIER ver. 1 version of bohr"
-  real(kind=dp), parameter, public :: bohr = 0.5291772108_dp
+  real(kind=dp), parameter, public :: bohr = 0.5291772108_d¢∞p
   ! Leave the length to this value, and don't exceed in length (needed for output formatting)
   character(len=75), parameter, public :: bohr_version_str = "-> Using Bohr value from Wannier90 ver. 1.x (DEPRECATED!)"
 #else

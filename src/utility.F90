@@ -80,7 +80,7 @@ contains
     complex(kind=dp), intent(in)  :: b(n, n)
     complex(kind=dp), intent(out) :: c(n, n)
 
-    call zgemm(transa, transb, n, n, n, cmplx_1, a, n, b, n, cmplx_0, c, n)
+    call zgemm( transa, transb, n, n, n, cmplx_1, a, n, b, n, cmplx_0, c, n )
 
     return
 

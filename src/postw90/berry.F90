@@ -871,7 +871,37 @@ contains
             fermi_energy_list(if)
           write (stdout, '(/,/,1x,a)') &
             'M_orb (bohr magn/cell)        x          y          z'
-          if (iprint > 1) then
+          if (iprint > 2) then
+                    
+            write (stdout, '(1x,a)') &
+              '======================'
+            write (stdout, '(1x,a22,2x,3(f10.4,1x))') &
+            'Local circulation (J0):', LCtil_list(1, :, if)
+            write (stdout, '(1x,a22,2x,3(f10.4,1x))') &
+            'Local circulation (J1):', LCtil_list(1, :, if)
+            write (stdout, '(1x,a22,2x,3(f10.4,1x))') &
+            'Local circulation (J2):', LCtil_list(1, :, if)
+            write (stdout, '(1x,a22,2x,3(f10.4,1x))') &
+            'Local circulation (tot):', &
+              sum(LCtil_list(1:3, 1, if)), sum(LCtil_list(1:3, 2, if)), &
+              sum(LCtil_list(1:3, 3, if))  
+
+            write (stdout, '(1x,a22,2x,3(f10.4,1x))') &
+            'Itinerant circulation (J0):', ICtil_list(1, :, if)
+            write (stdout, '(1x,a22,2x,3(f10.4,1x))') &
+            'Itinerant circulation (J0):', ICtil_list(2, :, if)
+            write (stdout, '(1x,a22,2x,3(f10.4,1x))') &
+            'Itinerant circulation (J0):', ICtil_list(3, :, if)
+            write (stdout, '(1x,a22,2x,3(f10.4,1x))') &
+            'Itinerant circulation (tot):',&
+              sum(ICtil_list(1:3, 1, if)), sum(ICtil_list(1:3, 2, if)), &
+              sum(ICtil_list(1:3, 3, if))
+            write (stdout, '(1x,a)') &
+              '--------------------------------------------------------'
+            write (stdout, '(1x,a22,2x,3(f10.4,1x),/)') 'Total   :', &
+              sum(Morb_list(1:3, 1, if)), sum(Morb_list(1:3, 2, if)), &
+              sum(Morb_list(1:3, 3, if))
+          elseif (iprint > 1) then
             write (stdout, '(1x,a)') &
               '======================'
             write (stdout, '(1x,a22,2x,3(f10.4,1x))') 'Local circulation :', &

@@ -15,7 +15,7 @@ begin projections
 Fe: sp3d2;dxy;dxz;dyz
 end projections
 
-#fermi_energy = 12.6279
+fermi_energy = 12.6279
 
 
 kpath = true
